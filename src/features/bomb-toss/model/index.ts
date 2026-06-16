@@ -2,6 +2,7 @@ export { loadSpriteAssets } from "./assets";
 export {
   createStateForLevel,
   createInitialState,
+  goToLevel,
   launchBomb,
   nextLevel,
   restartLevel,

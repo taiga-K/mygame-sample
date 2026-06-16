@@ -51,6 +51,9 @@ export const restartLevel = (state: TossGameState): TossGameState =>
 export const nextLevel = (state: TossGameState): TossGameState =>
   createStateForLevel((state.levelIndex + 1) % LEVELS.length);
 
+export const goToLevel = (levelIndex: number): TossGameState =>
+  createStateForLevel(clamp(levelIndex, 0, LEVELS.length - 1));
+
 export const setAimTarget = (state: TossGameState, target: Vec) => {
   if (state.phase !== "aiming") {
     return;

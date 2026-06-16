@@ -8,6 +8,7 @@ import type { Vec } from "@/shared/lib/physics";
 import { loadSpriteAssets } from "../model";
 import {
   createInitialState,
+  goToLevel,
   launchBomb,
   nextLevel,
   restartLevel,
@@ -55,6 +56,10 @@ export const createBombTossGame = () => {
     state = restartLevel(state);
   };
 
+  const goToFirstLevel = () => {
+    state = goToLevel(0);
+  };
+
   canvas.addEventListener("pointerdown", (event) => {
     canvas.setPointerCapture(event.pointerId);
     const point = toWorldPoint(event);
@@ -66,6 +71,11 @@ export const createBombTossGame = () => {
 
     if (isInsideRetry(point)) {
       resetToLevel();
+      return;
+    }
+
+    if (isInsideHomeButton(point, state.levelIndex)) {
+      goToFirstLevel();
       return;
     }
 
@@ -104,6 +114,10 @@ export const createBombTossGame = () => {
   window.addEventListener("keydown", (event) => {
     if (event.key.toLowerCase() === "r") {
       resetToLevel();
+    }
+
+    if (event.key.toLowerCase() === "h" && state.levelIndex > 0) {
+      goToFirstLevel();
     }
 
     if (event.key === "Enter" && state.phase === "cleared") {
@@ -189,7 +203,37 @@ const drawHud = (context: CanvasRenderingContext2D, state: TossGameState) => {
   context.fillText(`爆弾 ${Math.max(0, state.level.bombs - state.shotsUsed)}`, 250, 76);
   context.restore();
 
+  if (state.levelIndex > 0) {
+    drawHomeButton(context);
+  }
+
   drawRetryButton(context);
+};
+
+const HOME_BUTTON_CENTER = { x: 880, y: 48 };
+
+const drawHomeButton = (context: CanvasRenderingContext2D) => {
+  context.save();
+  context.translate(HOME_BUTTON_CENTER.x, HOME_BUTTON_CENTER.y);
+  context.fillStyle = "#17201f";
+  context.strokeStyle = "#17201f";
+  context.lineWidth = 3;
+  context.lineJoin = "round";
+  context.beginPath();
+  context.moveTo(0, -16);
+  context.lineTo(14, -2);
+  context.lineTo(14, 14);
+  context.lineTo(-14, 14);
+  context.lineTo(-14, -2);
+  context.closePath();
+  context.stroke();
+  context.beginPath();
+  context.moveTo(-6, 14);
+  context.lineTo(-6, 2);
+  context.lineTo(6, 2);
+  context.lineTo(6, 14);
+  context.stroke();
+  context.restore();
 };
 
 const drawRetryButton = (context: CanvasRenderingContext2D) => {
@@ -209,6 +253,9 @@ const drawRetryButton = (context: CanvasRenderingContext2D) => {
   context.fill();
   context.restore();
 };
+
+const isInsideHomeButton = (point: Vec, levelIndex: number) =>
+  levelIndex > 0 && distance(point, HOME_BUTTON_CENTER) <= 34;
 
 const isInsideRetry = (point: Vec) => distance(point, { x: 936, y: 48 }) <= 34;
 
