@@ -14,8 +14,15 @@ import {
   setAimTarget,
   updateGame,
 } from "../model";
-import type { ActiveBomb, SpriteAssets, TossGameState } from "../model";
+import type { ActiveBomb, GamePhase, SpriteAssets, TossGameState } from "../model";
 
+import {
+  createCelebrationSession,
+  drawClearCelebration,
+  isCelebrationPhase,
+  updateCelebrationSession,
+} from "./clear-celebration";
+import type { CelebrationSession } from "./clear-celebration";
 import "./game-stage.css";
 
 const VIEW_WIDTH = WORLD.width;
@@ -41,6 +48,8 @@ export const createBombTossGame = () => {
   let state = createInitialState();
   let assets: SpriteAssets | null = null;
   let animationId = 0;
+  let celebration: CelebrationSession | null = null;
+  let previousPhase: GamePhase = state.phase;
 
   const toWorldPoint = (event: PointerEvent): Vec => {
     const rect = canvas.getBoundingClientRect();
@@ -127,7 +136,17 @@ export const createBombTossGame = () => {
   const tick = (now: number) => {
     if (assets) {
       updateGame(state, now);
-      render(context, state, assets);
+
+      if (isCelebrationPhase(state.phase) && !isCelebrationPhase(previousPhase)) {
+        celebration = createCelebrationSession(now);
+      } else if (!isCelebrationPhase(state.phase)) {
+        celebration = null;
+      } else if (celebration) {
+        updateCelebrationSession(celebration, now);
+      }
+
+      previousPhase = state.phase;
+      render(context, state, assets, now, celebration);
     }
 
     animationId = requestAnimationFrame(tick);
@@ -146,6 +165,8 @@ const render = (
   context: CanvasRenderingContext2D,
   state: TossGameState,
   assets: SpriteAssets,
+  now: number,
+  celebration: CelebrationSession | null,
 ) => {
   context.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
   drawBackground(context, state, assets);
@@ -156,7 +177,7 @@ const render = (
   drawActors(context, state, assets);
   drawBomb(context, state.bomb, assets);
   drawExplosion(context, state, assets);
-  drawMessage(context, state);
+  drawMessage(context, state, now, celebration);
 };
 
 const drawBackground = (
@@ -397,15 +418,30 @@ const drawExplosion = (
   context.restore();
 };
 
-const drawMessage = (context: CanvasRenderingContext2D, state: TossGameState) => {
-  const isDone = state.phase === "cleared" || state.phase === "completed" || state.phase === "failed";
+const drawMessage = (
+  context: CanvasRenderingContext2D,
+  state: TossGameState,
+  now: number,
+  celebration: CelebrationSession | null,
+) => {
+  if (isCelebrationPhase(state.phase) && celebration) {
+    drawClearCelebration(
+      context,
+      state.phase,
+      celebration,
+      now,
+      getMessageTitle(state),
+      getMessageSubtitle(state),
+    );
+    return;
+  }
 
-  if (!isDone) {
+  if (state.phase !== "failed") {
     return;
   }
 
   context.save();
-  context.fillStyle = state.phase === "failed" ? "rgba(255, 90, 95, 0.92)" : "rgba(23, 184, 144, 0.92)";
+  context.fillStyle = "rgba(255, 90, 95, 0.92)";
   roundedRectPath(context, 305, 176, 390, 178, 8);
   context.fill();
   context.fillStyle = "#ffffff";
@@ -421,9 +457,9 @@ const drawMessage = (context: CanvasRenderingContext2D, state: TossGameState) =>
 const getMessageTitle = (state: TossGameState) => {
   switch (state.phase) {
     case "cleared":
-      return "全員撃破";
+      return "ステージクリア！";
     case "completed":
-      return "全ステージクリア";
+      return "おめでとう！";
     case "failed":
       return "リトライ";
     case "aiming":
@@ -441,9 +477,9 @@ const getMessageTitle = (state: TossGameState) => {
 const getMessageSubtitle = (state: TossGameState) => {
   switch (state.phase) {
     case "cleared":
-      return "クリックで次のステージへ";
+      return "全員撃破しました";
     case "completed":
-      return "クリックでもう一度遊ぶ";
+      return "全ステージクリア";
     case "failed":
       return "クリックでやり直す";
     case "aiming":

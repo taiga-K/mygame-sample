@@ -8,4 +8,4 @@ export {
   setAimTarget,
   updateGame,
 } from "./game";
-export type { ActiveBomb, SpriteAssets, TossGameState } from "./types";
+export type { ActiveBomb, GamePhase, SpriteAssets, TossGameState } from "./types";
