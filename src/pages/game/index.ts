@@ -1,0 +1,1 @@
+export { mountGamePage } from "./ui";
