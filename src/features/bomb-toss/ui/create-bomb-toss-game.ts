@@ -156,7 +156,9 @@ const render = (
   drawActors(context, state, assets);
   drawBomb(context, state.bomb, assets);
   drawExplosion(context, state, assets);
+  drawCelebrationBackdrop(context, state);
   drawMessage(context, state);
+  drawCelebrationParticles(context, state);
 };
 
 const drawBackground = (
@@ -397,23 +399,170 @@ const drawExplosion = (
   context.restore();
 };
 
+const drawCelebrationBackdrop = (context: CanvasRenderingContext2D, state: TossGameState) => {
+  if (!state.celebration) {
+    return;
+  }
+
+  const age = state.celebration.age;
+
+  drawCelebrationFlash(context, age);
+  drawStarBurst(context, age);
+};
+
+const drawCelebrationFlash = (context: CanvasRenderingContext2D, age: number) => {
+  if (age > 0.4) {
+    return;
+  }
+
+  const flash = 1 - age / 0.4;
+
+  context.save();
+  context.fillStyle = `rgba(255, 255, 255, ${flash * 0.5})`;
+  context.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+  context.fillStyle = `rgba(23, 184, 144, ${flash * 0.28})`;
+  context.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+  context.restore();
+};
+
+const drawStarBurst = (context: CanvasRenderingContext2D, age: number) => {
+  const progress = clamp(age / 0.65, 0, 1);
+  const radius = 36 + progress * 300;
+  const alpha = (1 - progress) * 0.75;
+
+  if (alpha <= 0) {
+    return;
+  }
+
+  context.save();
+  context.translate(500, 265);
+  context.globalAlpha = alpha;
+
+  for (let index = 0; index < 14; index += 1) {
+    const angle = (index / 14) * Math.PI * 2 + age * 0.6;
+    const rayLength = radius * (0.72 + (index % 3) * 0.12);
+
+    context.strokeStyle = index % 2 === 0 ? "#f6e6a0" : "#ffffff";
+    context.lineWidth = index % 3 === 0 ? 4 : 2.5;
+    context.beginPath();
+    context.moveTo(0, 0);
+    context.lineTo(Math.cos(angle) * rayLength, Math.sin(angle) * rayLength);
+    context.stroke();
+  }
+
+  context.restore();
+};
+
+const drawCelebrationParticles = (context: CanvasRenderingContext2D, state: TossGameState) => {
+  if (!state.celebration) {
+    return;
+  }
+
+  for (const particle of state.celebration.particles) {
+    if (particle.y > VIEW_HEIGHT + 40 || particle.x < -40 || particle.x > VIEW_WIDTH + 40) {
+      continue;
+    }
+
+    context.save();
+    context.translate(particle.x, particle.y);
+    context.rotate(particle.rotation);
+    context.fillStyle = particle.color;
+
+    switch (particle.shape) {
+      case 0:
+        context.fillRect(-particle.size / 2, -particle.size / 2, particle.size, particle.size);
+        break;
+      case 1:
+        context.beginPath();
+        context.arc(0, 0, particle.size / 2, 0, Math.PI * 2);
+        context.fill();
+        break;
+      case 2:
+        context.fillRect(-particle.size / 2, -particle.size / 6, particle.size, particle.size / 3);
+        break;
+    }
+
+    context.restore();
+  }
+};
+
+const easeOutBack = (progress: number) => {
+  const overshoot = 1.70158;
+
+  return 1 + (overshoot + 1) * Math.pow(progress - 1, 3) + overshoot * Math.pow(progress - 1, 2);
+};
+
 const drawMessage = (context: CanvasRenderingContext2D, state: TossGameState) => {
-  const isDone = state.phase === "cleared" || state.phase === "completed" || state.phase === "failed";
+  const isSuccess = state.phase === "cleared" || state.phase === "completed";
+  const isDone = isSuccess || state.phase === "failed";
 
   if (!isDone) {
     return;
   }
 
+  const age = state.celebration?.age ?? 0;
+  const enterProgress = isSuccess ? clamp(age / 0.5, 0, 1) : 1;
+  const scale = isSuccess ? 0.5 + easeOutBack(enterProgress) * 0.5 : 1;
+  const alpha = isSuccess ? clamp(enterProgress * 1.15, 0, 1) : 1;
+  const pulse = isSuccess && enterProgress >= 1 ? 1 + Math.sin(age * 4.2) * 0.025 : 1;
+  const panelX = 305;
+  const panelY = 176;
+  const panelW = 390;
+  const panelH = 178;
+  const centerX = panelX + panelW / 2;
+  const centerY = panelY + panelH / 2;
+
   context.save();
+  context.globalAlpha = alpha;
+  context.translate(centerX, centerY);
+  context.scale(scale * pulse, scale * pulse);
+  context.translate(-centerX, -centerY);
+
+  if (isSuccess) {
+    context.save();
+    context.shadowColor = "rgba(23, 184, 144, 0.95)";
+    context.shadowBlur = 28 + Math.sin(age * 5) * 10;
+    context.fillStyle = "rgba(23, 184, 144, 0.35)";
+    roundedRectPath(context, panelX - 8, panelY - 8, panelW + 16, panelH + 16, 14);
+    context.fill();
+    context.restore();
+  }
+
   context.fillStyle = state.phase === "failed" ? "rgba(255, 90, 95, 0.92)" : "rgba(23, 184, 144, 0.92)";
-  roundedRectPath(context, 305, 176, 390, 178, 8);
+  roundedRectPath(context, panelX, panelY, panelW, panelH, 8);
   context.fill();
+
+  if (isSuccess && enterProgress >= 0.6) {
+    const checkScale = clamp((enterProgress - 0.6) / 0.4, 0, 1);
+    context.save();
+    context.translate(centerX, panelY + 42);
+    context.scale(checkScale, checkScale);
+    context.strokeStyle = "#ffffff";
+    context.lineWidth = 5;
+    context.lineCap = "round";
+    context.lineJoin = "round";
+    context.beginPath();
+    context.moveTo(-22, 2);
+    context.lineTo(-6, 18);
+    context.lineTo(24, -14);
+    context.stroke();
+    context.restore();
+  }
+
   context.fillStyle = "#ffffff";
   context.font = "900 36px Inter, system-ui, sans-serif";
   context.textAlign = "center";
-  context.fillText(getMessageTitle(state), 500, 242);
+  context.fillText(getMessageTitle(state), centerX, 258);
   context.font = "700 18px Inter, system-ui, sans-serif";
-  context.fillText(getMessageSubtitle(state), 500, 286);
+  context.fillText(getMessageSubtitle(state), centerX, 302);
+
+  if (isSuccess && age > 0.55) {
+    const blink = 0.55 + Math.sin(age * 6) * 0.45;
+    context.globalAlpha = alpha * blink;
+    context.font = "700 14px Inter, system-ui, sans-serif";
+    context.fillText("▼", centerX, 338);
+  }
+
   context.restore();
   context.textAlign = "left";
 };

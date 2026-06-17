@@ -28,6 +28,23 @@ export type ExplosionFx = {
   affected: number;
 };
 
+export type CelebrationParticle = {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  rotation: number;
+  spin: number;
+  color: string;
+  size: number;
+  shape: 0 | 1 | 2;
+};
+
+export type CelebrationFx = {
+  age: number;
+  particles: CelebrationParticle[];
+};
+
 export type TossGameState = {
   levelIndex: number;
   level: LevelDefinition;
@@ -38,6 +55,7 @@ export type TossGameState = {
   aimTarget: Vec;
   pointerDown: boolean;
   explosion: ExplosionFx | null;
+  celebration: CelebrationFx | null;
   message: string;
   lastTime: number;
   settleAge: number;

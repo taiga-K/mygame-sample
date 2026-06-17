@@ -16,6 +16,7 @@ import {
 } from "@/shared/lib/physics";
 import type { Vec } from "@/shared/lib/physics";
 
+import { createCelebration, updateCelebration } from "./celebration";
 import type { ActiveBomb, TossGameState } from "./types";
 
 const MAX_STEP = 1 / 30;
@@ -39,6 +40,7 @@ export const createStateForLevel = (levelIndex: number): TossGameState => {
     },
     pointerDown: false,
     explosion: null,
+    celebration: null,
     message: "Knock every enemy down",
     lastTime: performance.now(),
     settleAge: 0,
@@ -92,12 +94,12 @@ export const updateGame = (state: TossGameState, now: number) => {
   const dt = clamp((now - state.lastTime) / 1000, 0, MAX_STEP);
   state.lastTime = now;
 
-  if (
-    state.phase === "cleared" ||
-    state.phase === "completed" ||
-    state.phase === "failed" ||
-    state.phase === "aiming"
-  ) {
+  if (state.phase === "cleared" || state.phase === "completed") {
+    updateCelebration(state, dt);
+    return;
+  }
+
+  if (state.phase === "failed" || state.phase === "aiming") {
     return;
   }
 
@@ -293,11 +295,13 @@ const resolveTurnEnd = (state: TossGameState) => {
     if (state.levelIndex === LEVELS.length - 1) {
       state.phase = "completed";
       state.message = "Training complete";
+      state.celebration = createCelebration();
       return;
     }
 
     state.phase = "cleared";
     state.message = "All enemies down";
+    state.celebration = createCelebration();
     return;
   }
 
