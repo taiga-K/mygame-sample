@@ -1,4 +1,5 @@
 export { loadSpriteAssets } from "./assets";
+export { easeOutBack, easeOutCubic } from "./celebration";
 export {
   createStateForLevel,
   createInitialState,
