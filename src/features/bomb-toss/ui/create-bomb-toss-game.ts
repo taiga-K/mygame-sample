@@ -14,6 +14,7 @@ import {
   setAimTarget,
   updateGame,
 } from "../model";
+import { easeOutBack, easeOutCubic } from "../model";
 import type { ActiveBomb, SpriteAssets, TossGameState } from "../model";
 
 import "./game-stage.css";
@@ -156,6 +157,7 @@ const render = (
   drawActors(context, state, assets);
   drawBomb(context, state.bomb, assets);
   drawExplosion(context, state, assets);
+  drawCelebration(context, state);
   drawMessage(context, state);
 };
 
@@ -397,6 +399,56 @@ const drawExplosion = (
   context.restore();
 };
 
+const drawCelebration = (context: CanvasRenderingContext2D, state: TossGameState) => {
+  if (state.phase !== "cleared" && state.phase !== "completed") {
+    return;
+  }
+
+  const age = state.celebrationAge;
+  const overlayAlpha = easeOutCubic(Math.min(age / 0.35, 1)) * 0.3;
+
+  context.save();
+  context.fillStyle = `rgba(12, 24, 20, ${overlayAlpha})`;
+  context.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+  context.restore();
+
+  for (const particle of state.confetti) {
+    const fade = 1 - particle.life / particle.maxLife;
+    context.save();
+    context.globalAlpha = fade;
+    context.translate(particle.pos.x, particle.pos.y);
+    context.rotate(particle.rotation);
+    context.fillStyle = particle.color;
+    context.fillRect(-particle.size / 2, -particle.size / 4, particle.size, particle.size / 2);
+    context.restore();
+  }
+
+  const burstProgress = Math.min(age / 0.9, 1);
+  const burstRadius = 40 + burstProgress * 180;
+  const burstAlpha = (1 - burstProgress) * 0.55;
+  const starCount = 10;
+
+  context.save();
+  context.globalAlpha = burstAlpha;
+  context.strokeStyle = state.phase === "completed" ? "#f3b33d" : "#8ef5d4";
+  context.lineWidth = 3;
+
+  for (let index = 0; index < starCount; index += 1) {
+    const angle = (index / starCount) * Math.PI * 2 + age * 0.6;
+    const innerX = 500 + Math.cos(angle) * burstRadius * 0.55;
+    const innerY = 265 + Math.sin(angle) * burstRadius * 0.55;
+    const outerX = 500 + Math.cos(angle) * burstRadius;
+    const outerY = 265 + Math.sin(angle) * burstRadius;
+
+    context.beginPath();
+    context.moveTo(innerX, innerY);
+    context.lineTo(outerX, outerY);
+    context.stroke();
+  }
+
+  context.restore();
+};
+
 const drawMessage = (context: CanvasRenderingContext2D, state: TossGameState) => {
   const isDone = state.phase === "cleared" || state.phase === "completed" || state.phase === "failed";
 
@@ -404,16 +456,69 @@ const drawMessage = (context: CanvasRenderingContext2D, state: TossGameState) =>
     return;
   }
 
+  const isCelebration = state.phase === "cleared" || state.phase === "completed";
+  const age = state.celebrationAge;
+  const panelCenterX = 500;
+  const panelCenterY = 265;
+  const panelWidth = 390;
+  const panelHeight = 178;
+  const enterProgress = isCelebration ? easeOutBack(Math.min(age / 0.45, 1)) : 1;
+  const pulse = isCelebration ? 1 + Math.sin(age * 4.2) * 0.018 * Math.min(age / 0.6, 1) : 1;
+  const scale = enterProgress * pulse;
+  const glowAlpha = isCelebration ? 0.22 + Math.sin(age * 3.6) * 0.08 : 0;
+
   context.save();
-  context.fillStyle = state.phase === "failed" ? "rgba(255, 90, 95, 0.92)" : "rgba(23, 184, 144, 0.92)";
-  roundedRectPath(context, 305, 176, 390, 178, 8);
+  context.translate(panelCenterX, panelCenterY);
+  context.scale(scale, scale);
+  context.translate(-panelCenterX, -panelCenterY);
+
+  if (isCelebration) {
+    context.save();
+    context.shadowColor = state.phase === "completed" ? "rgba(243, 179, 61, 0.95)" : "rgba(23, 184, 144, 0.95)";
+    context.shadowBlur = 28 + Math.sin(age * 3.6) * 10;
+    context.fillStyle = `rgba(23, 184, 144, ${0.18 + glowAlpha})`;
+    roundedRectPath(context, panelCenterX - panelWidth / 2 - 10, panelCenterY - panelHeight / 2 - 10, panelWidth + 20, panelHeight + 20, 14);
+    context.fill();
+    context.restore();
+  }
+
+  context.fillStyle = state.phase === "failed"
+    ? "rgba(255, 90, 95, 0.92)"
+    : state.phase === "completed"
+      ? "rgba(243, 179, 61, 0.94)"
+      : "rgba(23, 184, 144, 0.92)";
+  roundedRectPath(context, panelCenterX - panelWidth / 2, panelCenterY - panelHeight / 2, panelWidth, panelHeight, 8);
   context.fill();
+
+  if (isCelebration) {
+    const ribbonY = panelCenterY - panelHeight / 2 - 18 + easeOutCubic(Math.min(age / 0.3, 1)) * 18;
+    context.fillStyle = state.phase === "completed" ? "#fff4d6" : "#d9fff2";
+    roundedRectPath(context, panelCenterX - 132, ribbonY - 18, 264, 36, 18);
+    context.fill();
+    context.fillStyle = state.phase === "completed" ? "#8a5a00" : "#0d6b52";
+    context.font = "900 20px Inter, system-ui, sans-serif";
+    context.textAlign = "center";
+    context.fillText(
+      state.phase === "completed" ? "コンプリート!" : "ステージクリア!",
+      panelCenterX,
+      ribbonY + 7,
+    );
+  }
+
   context.fillStyle = "#ffffff";
   context.font = "900 36px Inter, system-ui, sans-serif";
   context.textAlign = "center";
-  context.fillText(getMessageTitle(state), 500, 242);
+  context.fillText(getMessageTitle(state), panelCenterX, panelCenterY - 23);
   context.font = "700 18px Inter, system-ui, sans-serif";
-  context.fillText(getMessageSubtitle(state), 500, 286);
+  context.fillText(getMessageSubtitle(state), panelCenterX, panelCenterY + 21);
+
+  if (isCelebration && age > 0.35) {
+    const hintAlpha = 0.55 + Math.sin(age * 5) * 0.25;
+    context.globalAlpha = hintAlpha;
+    context.font = "800 15px Inter, system-ui, sans-serif";
+    context.fillText("▼", panelCenterX, panelCenterY + panelHeight / 2 - 18);
+  }
+
   context.restore();
   context.textAlign = "left";
 };

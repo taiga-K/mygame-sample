@@ -2,6 +2,8 @@ import type { ActorBody } from "@/entities/actor";
 import type { LevelDefinition } from "@/entities/level";
 import type { Vec } from "@/shared/lib/physics";
 
+import type { ConfettiParticle } from "./celebration";
+
 export type GamePhase = "aiming" | "flying" | "exploding" | "settling" | "cleared" | "completed" | "failed";
 
 export type SpriteAssets = {
@@ -41,4 +43,6 @@ export type TossGameState = {
   message: string;
   lastTime: number;
   settleAge: number;
+  celebrationAge: number;
+  confetti: ConfettiParticle[];
 };

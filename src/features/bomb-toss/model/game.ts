@@ -16,6 +16,7 @@ import {
 } from "@/shared/lib/physics";
 import type { Vec } from "@/shared/lib/physics";
 
+import { spawnClearConfetti, updateConfetti } from "./celebration";
 import type { ActiveBomb, TossGameState } from "./types";
 
 const MAX_STEP = 1 / 30;
@@ -42,6 +43,8 @@ export const createStateForLevel = (levelIndex: number): TossGameState => {
     message: "Knock every enemy down",
     lastTime: performance.now(),
     settleAge: 0,
+    celebrationAge: 0,
+    confetti: [],
   };
 };
 
@@ -95,9 +98,16 @@ export const updateGame = (state: TossGameState, now: number) => {
   if (
     state.phase === "cleared" ||
     state.phase === "completed" ||
-    state.phase === "failed" ||
-    state.phase === "aiming"
+    state.phase === "failed"
   ) {
+    state.celebrationAge += dt;
+    if (state.phase === "cleared" || state.phase === "completed") {
+      state.confetti = updateConfetti(state.confetti, dt);
+    }
+    return;
+  }
+
+  if (state.phase === "aiming") {
     return;
   }
 
@@ -293,11 +303,13 @@ const resolveTurnEnd = (state: TossGameState) => {
     if (state.levelIndex === LEVELS.length - 1) {
       state.phase = "completed";
       state.message = "Training complete";
+      startCelebration(state);
       return;
     }
 
     state.phase = "cleared";
     state.message = "All enemies down";
+    startCelebration(state);
     return;
   }
 
@@ -309,4 +321,9 @@ const resolveTurnEnd = (state: TossGameState) => {
 
   state.phase = "aiming";
   state.message = "Knock every enemy down";
+};
+
+const startCelebration = (state: TossGameState) => {
+  state.celebrationAge = 0;
+  state.confetti = spawnClearConfetti(WORLD.width, WORLD.height);
 };
